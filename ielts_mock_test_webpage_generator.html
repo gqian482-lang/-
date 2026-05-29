@@ -1,0 +1,624 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>IELTS 机考模拟系统</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 min-h-screen p-6">
+  <div class="max-w-6xl mx-auto">
+    <div class="bg-white rounded-3xl shadow-xl p-6 mb-6">
+      <h1 class="text-4xl font-bold mb-2">IELTS 机考模拟系统</h1>
+      <p class="text-gray-600 mb-6">上传 TXT / JSON 文件，自定义制作阅读或听力题目。</p>
+
+      <div class="grid md:grid-cols-2 gap-6">
+        <div class="border-2 border-dashed border-gray-300 rounded-2xl p-6">
+          <h2 class="text-2xl font-semibold mb-4">上传题库文件</h2>
+          <input id="fileInput" type="file" accept=".txt,.json" class="mb-4 block w-full" />
+
+          <div class="bg-gray-50 rounded-xl p-4 text-sm text-gray-700">
+            <p class="font-semibold mb-2">TXT 文件格式示例：</p>
+<pre class="whitespace-pre-wrap text-xs overflow-auto">
+QUESTION: What is the capital of Australia?
+A. Sydney
+B. Melbourne
+C. Canberra
+D. Perth
+ANSWER: C
+
+QUESTION: IELTS stands for?
+A. International English Language Testing System
+B. ...
+ANSWER: A
+</pre>
+          </div>
+        </div>
+
+        <div class="bg-blue-50 rounded-2xl p-6">
+          <h2 class="text-2xl font-semibold mb-4">功能</h2>
+          <ul class="space-y-3 text-gray-700">
+            <li>✅ 支持上传自定义题目</li>
+            <li>✅ 自动生成选择题</li>
+            <li>✅ 机考倒计时</li>
+            <li>✅ 自动评分</li>
+            <li>✅ 显示正确答案</li>
+            <li>✅ 可部署到 GitHub Pages / Vercel</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="bg-white rounded-3xl shadow-xl p-6 mb-6">
+      <div class="flex justify-between items-center mb-6">
+        <h2 class="text-3xl font-bold">考试区域</h2>
+        <div class="text-xl font-semibold text-red-500">
+          剩余时间：<span id="timer">60:00</span>
+        </div>
+      </div>
+
+      <div id="questionsContainer" class="space-y-8"></div>
+
+      <div class="mt-8 flex gap-4">
+        <button onclick="submitExam()"
+          class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-semibold transition">
+          提交试卷
+        </button>
+
+        <button onclick="loadDemoQuestions()"
+          class="bg-gray-700 hover:bg-gray-800 text-white px-6 py-3 rounded-xl font-semibold transition">
+          加载演示题目
+        </button>
+      </div>
+    </div>
+
+    <div id="resultBox" class="hidden bg-green-50 border border-green-200 rounded-3xl p-6 shadow-lg">
+      <h2 class="text-3xl font-bold mb-4">考试结果</h2>
+      <p class="text-2xl mb-2">得分：<span id="score"></span></p>
+      <div id="answerReview" class="space-y-4"></div>
+    </div>
+  </div>
+
+  <script>
+    let questions = [];
+    let totalSeconds = 60 * 60;
+
+    function startTimer() {
+      setInterval(() => {
+        if (totalSeconds <= 0) return;
+
+        totalSeconds--;
+
+        const minutes = Math.floor(totalSeconds / 60);
+        const seconds = totalSeconds % 60;
+
+        document.getElementById('timer').innerText =
+          `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+      }, 1000);
+    }
+
+    startTimer();
+
+    function renderQuestions() {
+      const container = document.getElementById('questionsContainer');
+      container.innerHTML = '';
+
+      questions.forEach((q, index) => {
+        const questionDiv = document.createElement('div');
+        questionDiv.className = 'bg-gray-50 p-6 rounded-2xl';
+
+        questionDiv.innerHTML = `
+          <h3 class="text-xl font-semibold mb-4">
+            ${index + 1}. ${q.question}
+          </h3>
+
+          <div class="space-y-3">
+            ${q.options.map(option => `
+              <label class="flex items-center gap-3 bg-white p-3 rounded-xl cursor-pointer hover:bg-blue-50 transition">
+                <input type="radio" name="q${index}" value="${option[0]}" />
+                <span>${option}</span>
+              </label>
+            `).join('')}
+          </div>
+        `;
+
+        container.appendChild(questionDiv);
+      });
+    }
+
+    function submitExam() {
+      let correct = 0;
+      let reviewHTML = '';
+
+      questions.forEach((q, index) => {
+        const selected = document.querySelector(`input[name="q${index}"]:checked`);
+        const answer = selected ? selected.value : '未作答';
+
+        if (answer === q.answer) {
+          correct++;
+        }
+
+        reviewHTML += `
+          <div class="bg-white p-4 rounded-xl border">
+            <p class="font-semibold mb-2">${index + 1}. ${q.question}</p>
+            <p>你的答案：<span class="font-bold">${answer}</span></p>
+            <p>正确答案：<span class="text-green-600 font-bold">${q.answer}</span></p>
+          </div>
+        `;
+      });
+
+      document.getElementById('score').innerText = `${correct} / ${questions.length}`;
+      document.getElementById('answerReview').innerHTML = reviewHTML;
+      document.getElementById('resultBox').classList.remove('hidden');
+
+      window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+    }
+
+    function parseTXT(content) {
+      const blocks = content.split(/\n\s*\n/);
+      const parsed = [];
+
+      blocks.forEach(block => {
+        const lines = block.split('\n').map(line => line.trim()).filter(Boolean);
+
+        let question = '';
+        let options = [];
+        let answer = '';
+
+        lines.forEach(line => {
+          if (line.startsWith('QUESTION:')) {
+            question = line.replace('QUESTION:', '').trim();
+          } else if (/^[A-D]\./.test(line)) {
+            options.push(line);
+          } else if (line.startsWith('ANSWER:')) {
+            answer = line.replace('ANSWER:', '').trim();
+          }
+        });
+
+        if (question && options.length && answer) {
+          parsed.push({ question, options, answer });
+        }
+      });
+
+      return parsed;
+    }
+
+    document.getElementById('fileInput').addEventListener('change', function(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+
+      reader.onload = function(e) {
+        const content = e.target.result;
+
+        if (file.name.endsWith('.json')) {
+          questions = JSON.parse(content);
+        } else {
+          questions = parseTXT(content);
+        }
+
+        renderQuestions();
+        alert(`成功加载 ${questions.length} 道题目！`);
+      };
+
+      reader.readAsText(file);
+    });
+
+    function loadDemoQuestions() {
+      questions = [
+        {
+          question: 'What is the capital of Australia?',
+          options: [
+            'A. Sydney',
+            'B. Melbourne',
+            'C. Canberra',
+            'D. Perth'
+          ],
+          answer: 'C'
+        },
+        {
+          question: 'IELTS stands for?',
+          options: [
+            'A. International English Language Testing System',
+            'B. International Education Language Test System',
+            'C. English Testing Language System',
+            'D. None of the above'
+          ],
+          answer: 'A'
+        }
+      ];
+
+      renderQuestions();
+    }
+  </script>
+  <!-- ================= ADVANCED IELTS FEATURES ================= -->
+  <script>
+    // Listening Audio Player
+    function createListeningPlayer(audioUrl) {
+      const player = document.createElement('audio');
+      player.controls = true;
+      player.className = 'w-full mt-4';
+      player.src = audioUrl;
+      document.body.prepend(player);
+    }
+
+    // Writing Task Timer
+    function startWritingTimer(minutes = 60) {
+      let writingSeconds = minutes * 60;
+
+      const writingTimer = document.createElement('div');
+      writingTimer.className = 'fixed top-4 right-4 bg-black text-white px-4 py-2 rounded-xl z-50';
+      document.body.appendChild(writingTimer);
+
+      setInterval(() => {
+        if (writingSeconds <= 0) return;
+
+        writingSeconds--;
+
+        const mins = Math.floor(writingSeconds / 60);
+        const secs = writingSeconds % 60;
+
+        writingTimer.innerText = `Writing Time: ${mins}:${String(secs).padStart(2, '0')}`;
+      }, 1000);
+    }
+
+    // IELTS-style Reading Layout
+    function renderReadingPassage(passage, questionsHTML) {
+      const layout = document.createElement('div');
+      layout.className = 'grid grid-cols-2 gap-6 mt-8';
+
+      layout.innerHTML = `
+        <div class="bg-white rounded-2xl shadow p-6 h-[700px] overflow-y-auto leading-8">
+          <h2 class="text-2xl font-bold mb-4">Reading Passage</h2>
+          <div>${passage}</div>
+        </div>
+
+        <div class="bg-gray-50 rounded-2xl shadow p-6 h-[700px] overflow-y-auto">
+          <h2 class="text-2xl font-bold mb-4">Questions</h2>
+          ${questionsHTML}
+        </div>
+      `;
+
+      document.body.appendChild(layout);
+    }
+
+    // Score Statistics
+    const examHistory = [];
+
+    function saveScore(score, total) {
+      const record = {
+        score,
+        total,
+        date: new Date().toLocaleString()
+      };
+
+      examHistory.push(record);
+      localStorage.setItem('ieltsHistory', JSON.stringify(examHistory));
+    }
+
+    function renderStatistics() {
+      const history = JSON.parse(localStorage.getItem('ieltsHistory') || '[]');
+
+      const statsBox = document.createElement('div');
+      statsBox.className = 'bg-white p-6 rounded-2xl shadow mt-6';
+
+      statsBox.innerHTML = `
+        <h2 class="text-3xl font-bold mb-4">成绩统计</h2>
+        <div class="space-y-2">
+          ${history.map(item => `
+            <div class="border rounded-xl p-3">
+              <p>时间：${item.date}</p>
+              <p>成绩：${item.score}/${item.total}</p>
+            </div>
+          `).join('')}
+        </div>
+      `;
+
+      document.body.appendChild(statsBox);
+    }
+
+    // Word / PDF Import Notes
+    // 推荐后端：
+    // DOCX -> mammoth.js
+    // PDF -> pdf.js
+
+    async function importWordFile(file) {
+      alert('可接入 mammoth.js 自动解析 Word 题库');
+    }
+
+    async function importPDFFile(file) {
+      alert('可接入 pdf.js 自动解析 PDF 题库');
+    }
+
+    // AI Mock Exam Generator
+    async function generateAIQuestions(topic) {
+      const mockQuestions = [
+        {
+          question: `AI Generated Question about ${topic}`,
+          options: [
+            'A. Option A',
+            'B. Option B',
+            'C. Option C',
+            'D. Option D'
+          ],
+          answer: 'A'
+        }
+      ];
+
+      questions = mockQuestions;
+      renderQuestions();
+    }
+
+    // ================= HIGHLIGHT CHANNEL SYSTEM =================
+
+    function enableHighlightMode() {
+      const passages = document.querySelectorAll('.reading-passage');
+
+      passages.forEach(passage => {
+        passage.addEventListener('mouseup', () => {
+          const selection = window.getSelection();
+          const selectedText = selection.toString();
+
+          if (selectedText.length > 0) {
+            alert('已高亮: ' + selectedText.substring(0, 30) + '...');
+          }
+        });
+      });
+    }
+
+    // ================= WRITING WORD COUNTER =================
+
+    function createWritingArea() {
+      const writingBox = document.createElement('div');
+      writingBox.className = 'bg-white rounded-2xl shadow p-6 mt-8';
+
+      writingBox.innerHTML = '\
+        <h2 class="text-3xl font-bold mb-4">IELTS Writing Task</h2>\
+        <textarea id="writingInput" class="w-full h-[400px] border rounded-2xl p-4 text-lg leading-8 outline-none focus:ring-2 focus:ring-blue-400" placeholder="Start writing here..."></textarea>\
+        <div class="flex justify-between mt-4 text-lg font-semibold">\
+          <div>Words: <span id="wordCount">0</span></div>\
+          <div>Characters: <span id="charCount">0</span></div>\
+        </div>';
+
+      document.body.appendChild(writingBox);
+
+      const textarea = document.getElementById('writingInput');
+
+      textarea.addEventListener('input', () => {
+        const text = textarea.value.trim();
+
+        const words = text.length === 0 ? 0 : text.split(/\s+/).length;
+        const chars = text.length;
+
+        document.getElementById('wordCount').innerText = words;
+        document.getElementById('charCount').innerText = chars;
+      });
+    }
+
+    // ================= ADMIN PANEL =================
+
+    function createAdminPanel() {
+      const adminPanel = document.createElement('div');
+      adminPanel.className = 'fixed bottom-6 right-6 bg-white shadow-2xl rounded-2xl p-5 w-[350px] z-50';
+
+      adminPanel.innerHTML = '\
+        <h2 class="text-2xl font-bold mb-4">管理员后台</h2>\
+        <input id="adminTitle" type="text" placeholder="题目标题" class="w-full border rounded-xl p-3 mb-3" />\
+        <textarea id="adminQuestion" placeholder="输入题目内容" class="w-full border rounded-xl p-3 h-[120px] mb-3"></textarea>\
+        <button onclick="uploadQuestion()" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-xl font-semibold">上传题目</button>\
+        <div id="adminList" class="mt-4 space-y-2 max-h-[200px] overflow-y-auto"></div>';
+
+      document.body.appendChild(adminPanel);
+    }
+
+    function uploadQuestion() {
+      const title = document.getElementById('adminTitle').value;
+      const content = document.getElementById('adminQuestion').value;
+
+      if (!title || !content) {
+        alert('请填写完整内容');
+        return;
+      }
+
+      const database = JSON.parse(localStorage.getItem('questionBank') || '[]');
+
+      database.push({
+        title: title,
+        content: content,
+        createdAt: new Date().toLocaleString()
+      });
+
+      localStorage.setItem('questionBank', JSON.stringify(database));
+
+      renderAdminQuestions();
+
+      alert('题目上传成功');
+    }
+
+    function renderAdminQuestions() {
+      const database = JSON.parse(localStorage.getItem('questionBank') || '[]');
+      const adminList = document.getElementById('adminList');
+
+      if (!adminList) return;
+
+      adminList.innerHTML = database.map(item => '\
+        <div class="border rounded-xl p-3 bg-gray-50">\
+          <p class="font-semibold">' + item.title + '</p>\
+          <p class="text-sm text-gray-600 mt-1">' + item.createdAt + '</p>\
+        </div>'
+      ).join('');
+    }
+
+    // Real IELTS Computer Style Theme
+    document.body.classList.add('bg-[#f3f5f7]');
+
+    // ================= AUTO PROCTORING MODE =================
+
+    const violations = [];
+
+    function recordViolation(type) {
+      const violation = {
+        type: type,
+        time: new Date().toLocaleString()
+      };
+
+      violations.push(violation);
+
+      localStorage.setItem(
+        'violations',
+        JSON.stringify(violations)
+      );
+
+      updateViolationPanel();
+
+      if (violations.length >= 3) {
+        alert('违规次数过多，系统自动交卷');
+        submitExam();
+      }
+    }
+
+    function createViolationPanel() {
+      const panel = document.createElement('div');
+
+      panel.id = 'violationPanel';
+
+      panel.className = 'fixed top-4 left-4 bg-red-50 border border-red-300 rounded-2xl shadow-xl p-4 w-[320px] z-50';
+
+      panel.innerHTML = '\
+        <h2 class="text-xl font-bold text-red-600 mb-3">自动监考系统</h2>\
+        <div id="violationList" class="space-y-2 text-sm"></div>';
+
+      document.body.appendChild(panel);
+    }
+
+    function updateViolationPanel() {
+      const violationList = document.getElementById('violationList');
+
+      if (!violationList) return;
+
+      violationList.innerHTML = violations.map(v => '\
+        <div class="bg-white border rounded-xl p-2">\
+          <p><strong>违规:</strong> ' + v.type + '</p>\
+          <p><strong>时间:</strong> ' + v.time + '</p>\
+        </div>'
+      ).join('');
+    }
+
+    // Webcam Monitoring
+
+    async function startWebcamMonitoring() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: true,
+          audio: false
+        });
+
+        const webcam = document.createElement('video');
+
+        webcam.id = 'webcamMonitor';
+        webcam.autoplay = true;
+        webcam.muted = true;
+        webcam.srcObject = stream;
+
+        webcam.className = 'fixed bottom-4 left-4 w-72 rounded-2xl shadow-2xl border-4 border-white z-50';
+
+        document.body.appendChild(webcam);
+
+      } catch (err) {
+        alert('摄像头权限被拒绝');
+      }
+    }
+
+    // Tab Switch Detection
+
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        alert('检测到切屏行为');
+        recordViolation('切换页面');
+      }
+    });
+
+    // Fullscreen Lock
+
+    async function enableExamFullscreen() {
+      try {
+        await document.documentElement.requestFullscreen();
+      } catch (err) {
+        console.log(err);
+      }
+    }
+
+    document.addEventListener('fullscreenchange', () => {
+      if (!document.fullscreenElement) {
+        alert('禁止退出全屏');
+        recordViolation('退出全屏');
+      }
+    });
+
+    // Disable Copy Paste
+
+    document.addEventListener('copy', e => {
+      e.preventDefault();
+      recordViolation('复制内容');
+    });
+
+    document.addEventListener('paste', e => {
+      e.preventDefault();
+      recordViolation('粘贴内容');
+    });
+
+    document.addEventListener('contextmenu', e => {
+      e.preventDefault();
+      recordViolation('右键操作');
+    });
+
+    // Auto Screenshot Capture
+
+    function captureScreenshot() {
+      const webcam = document.getElementById('webcamMonitor');
+
+      if (!webcam) return;
+
+      const canvas = document.createElement('canvas');
+      canvas.width = webcam.videoWidth;
+      canvas.height = webcam.videoHeight;
+
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(webcam, 0, 0);
+
+      const imageData = canvas.toDataURL('image/png');
+
+      localStorage.setItem('lastViolationScreenshot', imageData);
+    }
+
+    setInterval(() => {
+      if (violations.length > 0) {
+        captureScreenshot();
+      }
+    }, 10000);
+
+    // AI Face Detection Placeholder
+    // 可接入 face-api.js / TensorFlow.js
+
+    async function detectFaceStatus() {
+      console.log('AI face monitoring enabled');
+    }
+
+    setInterval(() => {
+      detectFaceStatus();
+    }, 5000);
+
+    // Example boot functions
+    startWritingTimer(60);
+    createWritingArea();
+    createAdminPanel();
+    renderAdminQuestions();
+    enableHighlightMode();
+    createViolationPanel();
+    startWebcamMonitoring();
+    enableExamFullscreen();
+    renderStatistics();
+  </script>
+</body>
+</html>
