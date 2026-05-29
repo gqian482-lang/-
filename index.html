@@ -15,7 +15,7 @@
       <div class="grid md:grid-cols-2 gap-6">
         <div class="border-2 border-dashed border-gray-300 rounded-2xl p-6">
           <h2 class="text-2xl font-semibold mb-4">上传题库文件</h2>
-          <input id="fileInput" type="file" accept=".txt,.json" class="mb-4 block w-full" />
+          <input id="fileInput" type="file" accept=".txt,.json,.pdf,.docx" class="mb-4 block w-full" />
 
           <div class="bg-gray-50 rounded-xl p-4 text-sm text-gray-700">
             <p class="font-semibold mb-2">TXT 文件格式示例：</p>
@@ -189,20 +189,64 @@ ANSWER: A
 
       const reader = new FileReader();
 
-      reader.onload = function(e) {
-        const content = e.target.result;
+      reader.onload = async function(e) {
 
-        if (file.name.endsWith('.json')) {
-          questions = JSON.parse(content);
-        } else {
-          questions = parseTXT(content);
-        }
+  const content = e.target.result;
 
-        renderQuestions();
-        alert(`成功加载 ${questions.length} 道题目！`);
-      };
+  // JSON
+  if (file.name.endsWith('.json')) {
 
-      reader.readAsText(file);
+    questions = JSON.parse(content);
+    renderQuestions();
+
+  }
+
+  // TXT
+  else if (file.name.endsWith('.txt')) {
+
+    questions = parseTXT(content);
+    renderQuestions();
+
+  }
+
+  // PDF
+  else if (file.name.endsWith('.pdf')) {
+
+    const typedarray = new Uint8Array(content);
+
+    const pdf = await pdfjsLib.getDocument(typedarray).promise;
+
+    let fullText = '';
+
+    for (let i = 1; i <= pdf.numPages; i++) {
+
+      const page = await pdf.getPage(i);
+
+      const textContent = await page.getTextContent();
+
+      const pageText = textContent.items
+        .map(item => item.str)
+        .join(' ');
+
+      fullText += pageText + '\\n';
+
+    }
+
+    questions = parseTXT(fullText);
+
+    renderQuestions();
+
+  }
+
+  alert(`成功加载 ${questions.length} 道题目！`);
+
+};
+
+if (file.name.endsWith('.pdf')) {
+  reader.readAsArrayBuffer(file);
+} else {
+  reader.readAsText(file);
+}
     });
 
     function loadDemoQuestions() {
@@ -620,5 +664,8 @@ ANSWER: A
     enableExamFullscreen();
     renderStatistics();
   </script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+</body>
+</html>
 </body>
 </html>
