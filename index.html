@@ -665,7 +665,25 @@ if (file.name.endsWith('.pdf')) {
     renderStatistics();
   </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
-</body>
-</html>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+
+<script>
+
+const firebaseConfig = {
+  apiKey: "AIzaSyBOwtetrcbFFbG6yJH75nuSgLf4qGGU-J4",
+  authDomain: "ielts-mock-system.firebaseapp.com",
+  projectId: "ielts-mock-system",
+  storageBucket: "ielts-mock-system.firebasestorage.app",
+  messagingSenderId: "214244526013",
+  appId: "1:214244526013:web:f456a060915d59ab4474d4"
+};
+
+firebase.initializeApp(firebaseConfig);
+
+const db = firebase.firestore();
+
+</script>
 </body>
 </html>
