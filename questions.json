@@ -1,16 +1,22 @@
 [
 {
-"module": "READING",
-"passageTitle": "Sample Passage",
-"passage": "IELTS began in the 1980s.",
-
-"questions": [
-  {
-    "questionId": 1,
-    "type": "TFNG",
-    "question": "IELTS began in the 1980s.",
-    "answer": "TRUE"
-  }
-]
+"question": "What is the capital of Australia?",
+"options": [
+"A. Sydney",
+"B. Melbourne",
+"C. Canberra",
+"D. Perth"
+],
+"answer": "C"
+},
+{
+"question": "IELTS stands for?",
+"options": [
+"A. International English Language Testing System",
+"B. International Education Language Test System",
+"C. English Testing Language System",
+"D. None of the above"
+],
+"answer": "A"
 }
 ]
