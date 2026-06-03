@@ -1,0 +1,16 @@
+[
+{
+"module": "READING",
+"passageTitle": "Sample Passage",
+"passage": "IELTS began in the 1980s.",
+
+"questions": [
+  {
+    "questionId": 1,
+    "type": "TFNG",
+    "question": "IELTS began in the 1980s.",
+    "answer": "TRUE"
+  }
+]
+}
+]
